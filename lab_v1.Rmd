@@ -1,9 +1,10 @@
----
-title: "Splines + GAMs (Lab)"
-author: "Banjarian"
-date: "2/7/2020"  
-output: html_document
----
+### Labs 7.8.2: Splines and 7.8.3: GAMs
+## Objectives
+1. Develop regression and smoothing splines to optimize model fit.
+2. Interpret plots of spline fits.
+3. Develop and explore Generalized Additive Models (GAMs) to study multiple features simultaneously.
+
+Before we first fit Wage to Age using a regression spline, we create an age grid of all occurrences of ages in the dataset - 18 to 80.
 ```{r}
 library(splines)
 require(ISLR)
@@ -18,15 +19,30 @@ plot(age,wage,col="gray")
 lines(age.grid,pred$fit,lwd=2)
 lines(age.grid,pred$fit+2*pred$se,lty="dashed")
 lines(age.grid,pred$fit-2*pred$se,lty="dashed")
+```
 
+Here we produced a spline with 3 knots - 6 degrees of freedom (or basis functions). We can also use `df`:
+
+```{r}
 dim(bs(age,knots=c(25,40,60)))
 dim(bs(age,df=6))
 attr(bs(age,df=6),"knots")  
+```
 
+Here, R chooses the 3 knots.
+
+Now, in order to fit a natural spline, use ns():
+
+```{r}
 fit2=lm(wage~ns(age,df=4),data=Wage)
 pred2=predict(fit2,newdata=list(age=age.grid),se=T)
+plot(age,wage,col="gray")
 lines(age.grid,pred2$fit,col="red",lwd=2)
 ```
+
+In order to fit a smoothing spline, we use smooth.spline()
+
+In the following piece of code, what differences do you expect in the plots of fit and fit2?
 
 ```{r}
 plot(age,wage,xlim=agelims,cex=.5,col="darkgrey")
@@ -39,6 +55,7 @@ lines(fit2,col="blue",lwd=2)
 legend("topright",legend=c("16 DF","6.8 DF"),
        col=c("red","blue"),lty=1,lwd=,cex=.8)
 ```
+
 
 ```{r}
 plot(age,wage,xlim=agelims,cex=.5,col="darkgrey")
@@ -53,9 +70,16 @@ legend("topright",legend=c("Span=0.2","Span=0.5"),
        col=c("red","blue"),lty=1,lwd=2,cex=.8)
 ```
 
+Here we have performed local linear regression using spans of 0.2 and 0.5: that is, each neighborhood consists of 20% or 50% of the observations.
+
+
+We now fit a GAM to predict wage using natural spline functions of year and age. Education as a qualitative predictor.
+
+This is basically a linear regression model using different basis functions, so lm() is appropriate.
 ```{r}
 gam1=lm(wage~ns(year,4)+ns(age,5)+education,data=Wage)
 ```
+How about if we want to use more general GAM components? Like smoothing splines?
 
 ```{r}
 library(gam)
@@ -65,12 +89,37 @@ plot(gam.m3,se=TRUE,col="blue")
 plot.Gam(gam1,se=T,col="red")
 ```
 
+All the terms are fit simultaneously, taking each other into account for the response.
+
+In these plots, `year` looks linear. Perform ANOVA to study which model is the best fit: no year, linear year, or spline year.
 ```{r}
 gam.m1=gam(wage~s(age,5)+education,data=Wage)
 gam.m2=gam(wage~year+s(age,5)+education,data=Wage)
 anova(gam.m1,gam.m2,gam.m3,test="F")
 summary(gam.m3)
 ```
+
+```{r}
+preds = predict(gam.m2, newdata = Wage)
+gam.lo = gam(wage~s(year,df=4)+lo(age,span=0.7)+education, data = Wage)
+plot.Gam(gam.lo, se=TRUE, col="green")
+```
+  
+We can also use lo() to create interactions before calling Gam.
+
+```{r}
+gam.lo.i = gam(wage~lo(year,age,span=0.5) + education, data=Wage)
+
+library(akima)
+plot(gam.lo.i)
+
+gam.lr = gam(I(wage>250)~year + s(age,df=5)+education, family = binomial, data=Wage)
+par(mfrow=c(1,3))
+plot(gam.lr,se=T,col="green")
+table(education, I(wage>250))
+```
+
+What do you notice above?
 
 ```{r}
 gam.lr.s=gam(I(wage>250)∼year+s(age,df=5)+education,family=binomial,
